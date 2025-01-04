@@ -43,7 +43,7 @@ func (obj *DNSProbe) Process(url string) {
 		fmt.Println(url)
 		return
 	}
-	if isResolved {
+	if isResolved && !obj.showUnresolved {
 		fmt.Println(url)
 		return
 	}
