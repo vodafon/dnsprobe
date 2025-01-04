@@ -16,29 +16,34 @@ import (
 )
 
 var (
-	flagProcs         = flag.Int("procs", 20, "concurrency")
-	flagTimeout       = flag.Duration("timeout", time.Second, "timeout for port scan")
-	flagSkipCname     = flag.Bool("skip-cname", false, "skip CNAME records")
-	flagCheckWildcard = flag.Bool("check-wildcard", false, "skip wilecard records")
-	flagVerbose       = flag.Bool("v", false, "verbose")
-	flagServer        = flag.String("server", "8.8.8.8:53", "dns server")
+	flagProcs          = flag.Int("procs", 20, "concurrency")
+	flagTimeout        = flag.Duration("timeout", time.Second, "timeout for port scan")
+	flagSkipCname      = flag.Bool("skip-cname", false, "skip CNAME records")
+	flagCheckWildcard  = flag.Bool("check-wildcard", false, "skip wilecard records")
+	flagVerbose        = flag.Bool("v", false, "verbose")
+	flagShowUnresolved = flag.Bool("unresolved", false, "show only unresolved domains")
+	flagServer         = flag.String("server", "8.8.8.8:53", "dns server")
 )
 
 type DNSProbe struct {
 	*sync.Mutex
-	server    string
-	random    string
-	wildcards map[string][]string
+	server         string
+	random         string
+	wildcards      map[string][]string
+	showUnresolved bool
 }
 
 func (obj *DNSProbe) Process(url string) {
 	domain := strings.ToLower(url)
 	for _, prefix := range []string{"http://", "https://"} {
-		if strings.HasPrefix(domain, prefix) {
-			domain = strings.TrimPrefix(domain, prefix)
-		}
+		domain = strings.TrimPrefix(domain, prefix)
 	}
-	if obj.isValid(domain) {
+	isResolved := obj.isValid(domain)
+	if obj.showUnresolved && !isResolved {
+		fmt.Println(url)
+		return
+	}
+	if isResolved {
 		fmt.Println(url)
 		return
 	}
@@ -52,10 +57,11 @@ func main() {
 	}
 
 	dnsProbe := &DNSProbe{
-		Mutex:     &sync.Mutex{},
-		server:    *flagServer,
-		random:    randString(10),
-		wildcards: make(map[string][]string),
+		Mutex:          &sync.Mutex{},
+		server:         *flagServer,
+		showUnresolved: *flagShowUnresolved,
+		random:         randString(10),
+		wildcards:      make(map[string][]string),
 	}
 	w := swork.NewWorkerGroup(*flagProcs, dnsProbe)
 
